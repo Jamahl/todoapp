@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clear To-Do List</title>
+    <style>
+        body {
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+            transition: background-color 0.3s ease;
+        }
+        body.dark-mode {
+            background-color: #181818;
+            color: #ffffff;
+        }
+        body.blue-mode {
+            background-color: #e0f7fa;
+        }
+        .container {
+            max-width: 400px;
+            margin: 50px auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s ease;
+        }
+        body.dark-mode .container {
+            background: #282828;
+        }
+        body.blue-mode .container {
+            background: #b2ebf2;
+        }
+        h1 {
+            text-align: center;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            padding: 10px;
+            background: #fffae6;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.3s ease;
+        }
+        li.dragging {
+            opacity: 0.5;
+        }
+        li.overdue {
+            background-color: #ffcccc;
+        }
+        body.dark-mode li {
+            background: #383838;
+        }
+        body.blue-mode li {
+            background: #80deea;
+        }
+        input[type="text"], input[type="date"] {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-top: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            transition: background-color 0.3s ease;
+        }
+        body.dark-mode input[type="text"], body.dark-mode input[type="date"] {
+            background: #282828;
+            color: #ffffff;
+            border: 1px solid #555555;
+        }
+        body.blue-mode input[type="text"], body.blue-mode input[type="date"] {
+            background: #e0f7fa;
+            border: 1px solid #80deea;
+        }
+        .delete-btn {
+            background: red;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 5px;
+        }
+        .category {
+            background: #ffeb3b;
+            color: black;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin-right: 5px;
+        }
+        .toggle-mode {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            cursor: pointer;
+        }
+        .theme-selector {
+            display: flex;
+            justify-content: center;
+            margin-top: 10px;
+        }
+        .theme-selector div {
+            cursor: pointer;
+            padding: 10px;
+            margin: 0 5px;
+            border-radius: 4px;
+        }
+        .theme-light {
+            background: #f0f0f0;
+        }
+        .theme-dark {
+            background: #181818;
+            color: white;
+        }
+        .theme-blue {
+            background: #80deea;
+        }
+        .search-bar {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Clear To-Do List</h1>
+        <input id="search-bar" class="search-bar" type="text" placeholder="Search tasks...">
+        <ul id="task-list"></ul>
+        <input id="new-task" type="text" placeholder="Add a new task...">
+        <input id="task-date" type="date">
+        <div class="category-selector">
+            <button class="category" data-category="Work">Work</button>
+            <button class="category" data-category="Personal">Personal</button>
+            <button class="category" data-category="Shopping">Shopping</button>
+        </div>
+        <div class="toggle-mode">Toggle Dark Mode</div>
+        <div class="theme-selector">
+            <div class="theme-light">Light</div>
+            <div class="theme-dark">Dark</div>
+            <div class="theme-blue">Blue</div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const taskList = document.getElementById('task-list');
+            const newTaskInput = document.getElementById('new-task');
+            const taskDateInput = document.getElementById('task-date');
+            const searchBar = document.getElementById('search-bar');
+            const toggleMode = document.querySelector('.toggle-mode');
+            const themeSelector = document.querySelector('.theme-selector');
+            let selectedCategory = 'General';
+
+            // Load tasks from localStorage
+            let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+
+            // Load dark mode preference from localStorage
+            if (localStorage.getItem('darkMode') === 'enabled') {
+                document.body.classList.add('dark-mode');
+            }
+
+            // Load theme preference from localStorage
+            if (localStorage.getItem('theme')) {
+                document.body.classList.add(localStorage.getItem('theme'));
+            }
+
+            // Function to save tasks to localStorage
+            function saveTasks() {
+                localStorage.setItem('tasks', JSON.stringify(tasks));
+            }
+
+            // Function to render tasks
+            function renderTasks(filter = '') {
+                taskList.innerHTML = '';
+                tasks.filter(task => task.text.includes(filter)).forEach((task, index) => {
+                    const li = document.createElement('li');
+                    li.textContent = `${task.text} (Due: ${task.date || 'No date'}) [${task.category}]`;
+                    li.draggable = true;
+                    const currentDate = new Date().toISOString().split('T')[0];
+                    if (task.date && task.date < currentDate) {
+                        li.classList.add('overdue');
+                    }
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.textContent = 'Delete';
+                    deleteBtn.classList.add('delete-btn');
+                    deleteBtn.addEventListener('click', () => {
+                        tasks.splice(index, 1);
+                        saveTasks();
+                        renderTasks(filter);
+                    });
+
+                    li.appendChild(deleteBtn);
+                    taskList.appendChild(li);
+
+                    li.addEventListener('dragstart', () => {
+                        li.classList.add('dragging');
+                    });
+
+                    li.addEventListener('dragend', () => {
+                        li.classList.remove('dragging');
+                    });
+
+                    li.addEventListener('dragover', (event) => {
+                        event.preventDefault();
+                        const draggingItem = document.querySelector('.dragging');
+                        if (li !== draggingItem) {
+                            const bounding = li.getBoundingClientRect();
+                            const offset = bounding.y + (bounding.height / 2);
+                            if (event.clientY - offset > 0) {
+                                taskList.insertBefore(draggingItem, li.nextSibling);
+                            } else {
+                                taskList.insertBefore(draggingItem, li);
+                            }
+                        }
+                    });
+
+                    li.addEventListener('drop', () => {
+                        const newTasks = [];
+                        document.querySelectorAll('#task-list li').forEach(item => {
+                            const text = item.textContent.split(' (Due: ')[0];
+                            const date = item.textContent.split('Due: ')[1].split(')')[0];
+                            const category = item.textContent.split('[')[1].split(']')[0];
+                            newTasks.push({ text, date, category });
+                        });
+                        tasks = newTasks;
+                        saveTasks();
+                        renderTasks(filter);
+                    });
+                });
+            }
+
+            // Initial render
+            renderTasks();
+
+            // Add new task
+            newTaskInput.addEventListener('keypress', (event) => {
+                if (event.key === 'Enter' && newTaskInput.value.trim() !== '') {
+                    tasks.push({
+                        text: newTaskInput.value.trim(),
+                        date: taskDateInput.value,
+                        category: selectedCategory
+                    });
+                    saveTasks();
+                    renderTasks();
+                    newTaskInput.value = '';
+                    taskDateInput.value = '';
+                }
+            });
+
+            // Toggle dark mode
+            toggleMode.addEventListener('click', () => {
+                document.body.classList.toggle('dark-mode');
+                if (document.body.classList.contains('dark-mode')) {
+                    localStorage.setItem('darkMode', 'enabled');
+                } else {
+                    localStorage.removeItem('darkMode');
+                }
+            });
+
+            // Theme selector
+            themeSelector.addEventListener('click', (event) => {
+                if (event.target.classList.contains('theme-light')) {
+                    document.body.className = '';
+                    localStorage.setItem('theme', '');
+                } else if (event.target.classList.contains('theme-dark')) {
+                    document.body.className = 'dark-mode';
+                    localStorage.setItem('theme', 'dark-mode');
+                } else if (event.target.classList.contains('theme-blue')) {
+                    document.body.className = 'blue-mode';
+                    localStorage.setItem('theme', 'blue-mode');
+                }
+            });
+
+            // Category selector
+            document.querySelectorAll('.category').forEach(button => {
+                button.addEventListener('click', () => {
+                    selectedCategory = button.dataset.category;
+                    document.querySelectorAll('.category').forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                });
+            });
+
+            // Search bar
+            searchBar.addEventListener('input', (event) => {
+                renderTasks(event.target.value);
+            });
+        });
+    </script>
+</body>
+</html>
+"""
+}
